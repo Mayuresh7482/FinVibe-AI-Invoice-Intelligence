@@ -1,0 +1,286 @@
+{% extends "invoices/base.html" %}
+{% load invoice_tags %}
+{% load humanize %}
+
+{% block title %}Dashboard{% endblock %}
+
+{% block content %}
+<!-- ─── Page Header ───────────────────────────────────────────────── -->
+<div class="d-flex justify-content-between align-items-center mb-4">
+   <div>
+      <h1 class="fw-bold mb-1" style="font-size: 1.75rem;">
+         <i class="bi bi-grid-1x2-fill text-primary me-2"></i>Dashboard
+      </h1>
+      <p class="text-muted mb-0">Overview of all invoices and expenses</p>
+   </div>
+   <a href="{% url 'invoice_create' %}" class="btn btn-primary d-flex align-items-center gap-2">
+      <i class="bi bi-plus-lg"></i> New Invoice
+   </a>
+</div>
+
+<!-- ─── KPI Cards ─────────────────────────────────────────────────── -->
+<div class="row g-3 mb-4">
+   <!-- Total Spent -->
+   <div class="col-xl-3 col-md-6">
+      <div class="kpi-card">
+         <div class="kpi-card-body">
+            <div class="kpi-icon bg-primary-subtle">
+               <i class="bi bi-currency-rupee text-primary"></i>
+            </div>
+            <div>
+               <p class="kpi-label">Total Spent</p>
+               <h3 class="kpi-value">₹{{ stats.total_spent|floatformat:2|intcomma }}</h3>
+            </div>
+         </div>
+         <div class="kpi-footer">
+            <span class="text-muted small">For current filters</span>
+         </div>
+      </div>
+   </div>
+   <!-- Invoice Count -->
+   <div class="col-xl-3 col-md-6">
+      <div class="kpi-card">
+         <div class="kpi-card-body">
+            <div class="kpi-icon bg-info-subtle">
+               <i class="bi bi-receipt text-info"></i>
+            </div>
+            <div>
+               <p class="kpi-label">Invoices</p>
+               <h3 class="kpi-value">{{ stats.invoice_count|intcomma }}</h3>
+            </div>
+         </div>
+         <div class="kpi-footer">
+            <span class="text-muted small">Total records</span>
+         </div>
+      </div>
+   </div>
+   <!-- AI Parsed -->
+   <div class="col-xl-3 col-md-6">
+      <div class="kpi-card">
+         <div class="kpi-card-body">
+            <div class="kpi-icon bg-success-subtle">
+               <i class="bi bi-robot text-success"></i>
+            </div>
+            <div>
+               <p class="kpi-label">AI Parsed</p>
+               <h3 class="kpi-value">{{ stats.ai_parsed_count|intcomma }}</h3>
+            </div>
+         </div>
+         <div class="kpi-footer">
+            <span class="text-muted small">
+               {{ stats.manual_count }} manual/fallback
+            </span>
+         </div>
+      </div>
+   </div>
+   <!-- Avg Confidence -->
+   <div class="col-xl-3 col-md-6">
+      <div class="kpi-card">
+         <div class="kpi-card-body">
+            <div class="kpi-icon bg-warning-subtle">
+               <i class="bi bi-speedometer2 text-warning"></i>
+            </div>
+            <div>
+               <p class="kpi-label">Avg Confidence</p>
+               <h3 class="kpi-value">{{ stats.avg_confidence|confidence_pct }}</h3>
+            </div>
+         </div>
+         <div class="kpi-footer">
+            <div class="confidence-bar-mini">
+               <div class="confidence-bar-fill bg-{{ stats.avg_confidence|confidence_color }}"
+                  style="width: {% widthratio stats.avg_confidence|default:0 1 100 %}%"></div>
+            </div>
+         </div>
+      </div>
+   </div>
+</div>
+
+<!-- ─── Filters ────────────────────────────────────────────────────── -->
+<div class="filter-card mb-4">
+   <form method="get" action="{% url 'dashboard' %}" id="filter-form">
+      <div class="row g-3 align-items-end">
+         <div class="col-lg-3 col-md-6">
+            <label class="form-label small fw-semibold text-muted">
+               <i class="bi bi-search me-1"></i>Search Vendor
+            </label>
+            {{ form.q }}
+         </div>
+         <div class="col-lg-2 col-md-6">
+            <label class="form-label small fw-semibold text-muted">
+               <i class="bi bi-tag me-1"></i>Category
+            </label>
+            {{ form.category }}
+         </div>
+         <div class="col-lg-2 col-md-6">
+            <label class="form-label small fw-semibold text-muted">
+               <i class="bi bi-calendar-event me-1"></i>From
+            </label>
+            {{ form.date_from }}
+         </div>
+         <div class="col-lg-2 col-md-6">
+            <label class="form-label small fw-semibold text-muted">
+               <i class="bi bi-calendar-event me-1"></i>To
+            </label>
+            {{ form.date_to }}
+         </div>
+         <div class="col-lg-2 col-md-6">
+            <label class="form-label small fw-semibold text-muted">
+               <i class="bi bi-funnel me-1"></i>Parsed By
+            </label>
+            {{ form.parsed }}
+         </div>
+         <div class="col-lg-1 col-md-12">
+            <div class="d-flex gap-2">
+               <button type="submit" class="btn btn-primary w-100">
+                  <i class="bi bi-funnel-fill"></i>
+               </button>
+               <a href="{% url 'dashboard' %}" class="btn btn-outline-secondary" title="Clear filters">
+                  <i class="bi bi-x-lg"></i>
+               </a>
+            </div>
+         </div>
+      </div>
+   </form>
+</div>
+
+<!-- ─── Invoice Table ─────────────────────────────────────────────── -->
+<div class="table-card">
+   <div class="table-responsive">
+      <table class="table table-hover align-middle mb-0" id="invoice-table">
+         <thead>
+            <tr>
+               <th class="text-muted small fw-semibold">DATE</th>
+               <th class="text-muted small fw-semibold">VENDOR</th>
+               <th class="text-muted small fw-semibold text-end">AMOUNT</th>
+               <th class="text-muted small fw-semibold">CATEGORY</th>
+               <th class="text-muted small fw-semibold text-center">PARSED</th>
+               <th class="text-muted small fw-semibold text-center">CONFIDENCE</th>
+               <th class="text-muted small fw-semibold text-end">ACTIONS</th>
+            </tr>
+         </thead>
+         <tbody>
+            {% for inv in invoices %}
+            <tr class="invoice-row" data-id="{{ inv.id }}">
+               <td>
+                  <span class="text-light">
+                     {% if inv.date %}
+                     {{ inv.date|date:"d M Y" }}
+                     {% else %}
+                     <span class="text-muted">—</span>
+                     {% endif %}
+                  </span>
+               </td>
+               <td>
+                  <div class="d-flex align-items-center gap-2">
+                     <div class="vendor-avatar">
+                        {{ inv.vendor_name|default:"?"|truncatechars:1 }}
+                     </div>
+                     <div>
+                        <span class="fw-medium">{{ inv.vendor_name|default:"Unknown Vendor"|truncatechars:35 }}</span>
+                        <br>
+                        <small class="text-muted">{{ inv.short_id }}</small>
+                     </div>
+                  </div>
+               </td>
+               <td class="text-end">
+                  <span class="fw-semibold text-light">
+                     {{ inv.amount|currency_format:inv.currency }}
+                  </span>
+               </td>
+               <td>
+                  <span class="category-badge">
+                     {{ inv.category }}
+                  </span>
+               </td>
+               <td class="text-center">
+                  {% if inv.parsed_by_ai %}
+                  <i class="bi bi-robot text-success" title="AI Parsed"></i>
+                  {% else %}
+                  <i class="bi bi-pencil text-muted" title="Manual/Fallback"></i>
+                  {% endif %}
+               </td>
+               <td class="text-center">
+                  {{ inv.ai_confidence|confidence_badge }}
+               </td>
+               <td class="text-end">
+                  <div class="btn-group btn-group-sm">
+                     <a href="{% url 'invoice_detail' pk=inv.pk %}" class="btn btn-outline-primary btn-sm"
+                        title="View/Edit">
+                        <i class="bi bi-eye"></i>
+                     </a>
+                     <form method="post" action="{% url 'invoice_delete' pk=inv.pk %}" class="d-inline"
+                        onsubmit="return confirm('Delete this invoice?')">
+                        {% csrf_token %}
+                        <button type="submit" class="btn btn-outline-danger btn-sm" title="Delete">
+                           <i class="bi bi-trash3"></i>
+                        </button>
+                     </form>
+                  </div>
+               </td>
+            </tr>
+            {% empty %}
+            <tr>
+               <td colspan="7" class="text-center py-5">
+                  <div class="empty-state">
+                     <i class="bi bi-inbox display-1 text-muted"></i>
+                     <h5 class="mt-3 text-muted">No invoices yet</h5>
+                     <p class="text-muted">Paste your first invoice to get started.</p>
+                     <a href="{% url 'invoice_create' %}" class="btn btn-primary mt-2">
+                        <i class="bi bi-plus-lg me-1"></i> Create Invoice
+                     </a>
+                  </div>
+               </td>
+            </tr>
+            {% endfor %}
+         </tbody>
+      </table>
+   </div>
+
+   <!-- Pagination -->
+   {% if invoices.has_other_pages %}
+   <div class="d-flex justify-content-between align-items-center px-3 py-3 border-top">
+      <span class="text-muted small">
+         Showing {{ invoices.start_index }}–{{ invoices.end_index }}
+         of {{ invoices.paginator.count }} invoices
+      </span>
+      <nav>
+         <ul class="pagination pagination-sm mb-0">
+            {% if invoices.has_previous %}
+            <li class="page-item">
+               <a class="page-link"
+                  href="?page={{ invoices.previous_page_number }}{% for key, value in form.cleaned_data.items %}{% if value %}&{{ key }}={{ value }}{% endif %}{% endfor %}">
+                  <i class="bi bi-chevron-left"></i>
+               </a>
+            </li>
+            {% endif %}
+
+            {% for num in invoices.paginator.page_range %}
+            {% if num == invoices.number %}
+            <li class="page-item active">
+               <span class="page-link">{{ num }}</span>
+            </li>
+            {% elif num > invoices.number|add:"-3" and num < invoices.number|add:"3" %} <li class="page-item">
+               <a class="page-link"
+                  href="?page={{ num }}{% for key, value in form.cleaned_data.items %}{% if value %}&{{ key }}={{ value }}{% endif %}{% endfor %}">{{
+                  num }}</a>
+               </li>
+               {% endif %}
+               {% endfor %}
+
+               {% if invoices.has_next %}
+               <li class="page-item">
+                  <a class="page-link"
+                     href="?page={{ invoices.next_page_number }}{% for key, value in form.cleaned_data.items %}{% if value %}&{{ key }}={{ value }}{% endif %}{% endfor %}">
+                     <i class="bi bi-chevron-right"></i>
+                  </a>
+               </li>
+               {% endif %}
+         </ul>
+      </nav>
+   </div>
+   {% endif %}
+</div>
+
+<!-- Demo Popup Modal -->
+{% include "invoices/partials/demo_modal.html" %}
+{% endblock %}

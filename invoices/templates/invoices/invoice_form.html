@@ -1,0 +1,122 @@
+{% extends "invoices/base.html" %}
+{% load invoice_tags %}
+
+{% block title %}{{ page_title }}{% endblock %}
+
+{% block content %}
+<!-- ─── Breadcrumb ────────────────────────────────────────────────── -->
+<nav aria-label="breadcrumb" class="mb-3">
+   <ol class="breadcrumb">
+      <li class="breadcrumb-item"><a href="{% url 'dashboard' %}" class="text-decoration-none">Dashboard</a></li>
+      <li class="breadcrumb-item active">{{ page_title }}</li>
+   </ol>
+</nav>
+
+<div class="row justify-content-center">
+   <div class="col-lg-8">
+      <div class="detail-card">
+         <div class="d-flex align-items-center gap-3 mb-4">
+            <div class="brand-icon" style="width: 48px; height: 48px; font-size: 1.2rem;">
+               <i class="bi bi-file-earmark-plus"></i>
+            </div>
+            <div>
+               <h2 class="fw-bold mb-0" style="font-size: 1.5rem;">{{ page_title }}</h2>
+               <p class="text-muted mb-0">Paste raw invoice text below — AI will extract fields automatically.</p>
+            </div>
+         </div>
+
+         <form method="post" id="invoice-form">
+            {% csrf_token %}
+
+            <!-- Raw Text (Primary Input) -->
+            <div class="mb-4">
+               <label for="id_raw_text" class="form-label fw-semibold">
+                  <i class="bi bi-file-text me-1 text-primary"></i> Raw Invoice Text
+                  <span class="text-danger">*</span>
+               </label>
+               {{ form.raw_text }}
+               <div class="form-text">
+                  Paste the invoice content. AI will auto-extract vendor, amount, date, and category.
+               </div>
+            </div>
+
+            <!-- Divider -->
+            <div class="d-flex align-items-center mb-4">
+               <hr class="flex-grow-1">
+               <span class="px-3 text-muted small fw-semibold">EXTRACTED / MANUAL FIELDS</span>
+               <hr class="flex-grow-1">
+            </div>
+
+            <!-- Editable Fields -->
+            <div class="row g-3 mb-4">
+               <div class="col-md-6">
+                  <label for="id_vendor_name" class="form-label fw-semibold">
+                     <i class="bi bi-building me-1 text-info"></i> Vendor Name
+                  </label>
+                  {{ form.vendor_name }}
+               </div>
+               <div class="col-md-6">
+                  <label for="id_amount" class="form-label fw-semibold">
+                     <i class="bi bi-currency-rupee me-1 text-success"></i> Amount
+                  </label>
+                  {{ form.amount }}
+               </div>
+               <div class="col-md-4">
+                  <label for="id_date" class="form-label fw-semibold">
+                     <i class="bi bi-calendar-event me-1 text-warning"></i> Invoice Date
+                  </label>
+                  {{ form.date }}
+               </div>
+               <div class="col-md-4">
+                  <label for="id_category" class="form-label fw-semibold">
+                     <i class="bi bi-tag me-1 text-primary"></i> Category
+                  </label>
+                  {{ form.category }}
+               </div>
+               <div class="col-md-4">
+                  <label for="id_currency" class="form-label fw-semibold">
+                     <i class="bi bi-globe me-1 text-info"></i> Currency
+                  </label>
+                  {{ form.currency }}
+               </div>
+            </div>
+
+            <!-- Re-parse option -->
+            {% if is_edit %}
+            <div class="form-check mb-4">
+               {{ form.force_reparse }}
+               <label class="form-check-label" for="id_force_reparse">
+                  Force AI re-parse (overwrites existing values)
+               </label>
+            </div>
+            {% endif %}
+
+            <!-- Submit -->
+            <div class="d-flex justify-content-between">
+               <a href="{% url 'dashboard' %}" class="btn btn-outline-secondary">
+                  <i class="bi bi-arrow-left me-1"></i> Cancel
+               </a>
+               <button type="submit" class="btn btn-primary px-4" id="btn-submit">
+                  <i class="bi bi-lightning-charge me-1"></i>
+                  {% if is_edit %}Save & Parse{% else %}Create & Parse{% endif %}
+               </button>
+            </div>
+         </form>
+      </div>
+
+      <!-- Help Card -->
+      <div class="detail-card mt-4">
+         <h6 class="fw-semibold mb-3">
+            <i class="bi bi-lightbulb text-warning me-2"></i>Tips
+         </h6>
+         <ul class="small text-muted mb-0">
+            <li class="mb-2">Paste the complete invoice text for best AI accuracy.</li>
+            <li class="mb-2">AI will extract vendor name, amount, date, and category automatically.</li>
+            <li class="mb-2">If AI confidence is low, a fallback regex parser will attempt extraction.</li>
+            <li class="mb-2">You can always edit AI-extracted values manually.</li>
+            <li>Fields left empty will be filled by AI. Pre-filled fields won't be overwritten unless forced.</li>
+         </ul>
+      </div>
+   </div>
+</div>
+{% endblock %}

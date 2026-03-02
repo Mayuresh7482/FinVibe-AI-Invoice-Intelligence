@@ -1,0 +1,228 @@
+{% extends "invoices/base.html" %}
+{% load invoice_tags %}
+
+{% block title %}{{ page_title }}{% endblock %}
+
+{% block content %}
+<!-- ─── Breadcrumb ────────────────────────────────────────────────── -->
+<nav aria-label="breadcrumb" class="mb-3">
+   <ol class="breadcrumb">
+      <li class="breadcrumb-item"><a href="{% url 'dashboard' %}" class="text-decoration-none">Dashboard</a></li>
+      <li class="breadcrumb-item active">Invoice #{{ invoice.short_id }}</li>
+   </ol>
+</nav>
+
+<div class="row g-4">
+   <!-- ─── Left: Invoice Detail ─────────────────────────────────── -->
+   <div class="col-lg-8">
+      <!-- Header -->
+      <div class="detail-card mb-4">
+         <div class="d-flex justify-content-between align-items-start mb-3">
+            <div>
+               <h2 class="fw-bold mb-1" style="font-size: 1.5rem;">
+                  <i class="bi bi-receipt-cutoff text-primary me-2"></i>
+                  Invoice #{{ invoice.short_id }}
+               </h2>
+               <span class="text-muted small">Created {{ invoice.created_at|timesince }} ago</span>
+            </div>
+            <div class="d-flex gap-2">
+               {% if invoice.parsed_by_ai %}
+               <span class="badge bg-success-subtle text-success-emphasis px-3 py-2">
+                  <i class="bi bi-robot me-1"></i> AI Parsed
+               </span>
+               {% else %}
+               <span class="badge bg-secondary-subtle text-secondary-emphasis px-3 py-2">
+                  <i class="bi bi-pencil me-1"></i> Manual
+               </span>
+               {% endif %}
+               {{ invoice.ai_confidence|confidence_badge }}
+            </div>
+         </div>
+
+         <!-- AI Action Buttons -->
+         <div class="d-flex gap-2 mb-3 flex-wrap">
+            <form method="post" action="{% url 'invoice_reparse' pk=invoice.pk %}" class="d-inline">
+               {% csrf_token %}
+               <button type="submit" class="btn btn-outline-primary btn-sm" id="btn-reparse">
+                  <i class="bi bi-arrow-clockwise me-1"></i> Re-parse (Force)
+               </button>
+            </form>
+            {% if invoice.parsed_by_ai %}
+            <form method="post" action="{% url 'invoice_accept_ai' pk=invoice.pk %}" class="d-inline">
+               {% csrf_token %}
+               <button type="submit" class="btn btn-outline-success btn-sm" id="btn-accept-ai">
+                  <i class="bi bi-check-lg me-1"></i> Accept AI Values
+               </button>
+            </form>
+            <form method="post" action="{% url 'invoice_reject_ai' pk=invoice.pk %}" class="d-inline"
+               onsubmit="return confirm('This will clear AI-parsed fields. Continue?')">
+               {% csrf_token %}
+               <button type="submit" class="btn btn-outline-danger btn-sm" id="btn-reject-ai">
+                  <i class="bi bi-x-lg me-1"></i> Reject AI Values
+               </button>
+            </form>
+            {% endif %}
+         </div>
+      </div>
+
+      <!-- Editable Form -->
+      <div class="detail-card mb-4">
+         <h5 class="fw-semibold mb-3">
+            <i class="bi bi-pencil-square text-primary me-2"></i>Edit Fields
+         </h5>
+         <form method="post" action="{% url 'invoice_detail' pk=invoice.pk %}" id="edit-form">
+            {% csrf_token %}
+            <div class="row g-3">
+               <div class="col-md-6">
+                  <label for="id_vendor_name" class="form-label small fw-semibold text-muted">
+                     Vendor Name
+                     {% if invoice.parsed_by_ai %}
+                     {{ invoice.ai_confidence|confidence_badge }}
+                     {% endif %}
+                  </label>
+                  {{ form.vendor_name }}
+               </div>
+               <div class="col-md-6">
+                  <label for="id_amount" class="form-label small fw-semibold text-muted">Amount</label>
+                  {{ form.amount }}
+               </div>
+               <div class="col-md-4">
+                  <label for="id_date" class="form-label small fw-semibold text-muted">Invoice Date</label>
+                  {{ form.date }}
+               </div>
+               <div class="col-md-4">
+                  <label for="id_category" class="form-label small fw-semibold text-muted">Category</label>
+                  {{ form.category }}
+               </div>
+               <div class="col-md-4">
+                  <label for="id_currency" class="form-label small fw-semibold text-muted">Currency</label>
+                  {{ form.currency }}
+               </div>
+               <div class="col-12">
+                  <label for="id_raw_text" class="form-label small fw-semibold text-muted">Raw Text</label>
+                  {{ form.raw_text }}
+               </div>
+            </div>
+            <div class="d-flex justify-content-between mt-4">
+               <button type="submit" class="btn btn-primary" id="btn-save">
+                  <i class="bi bi-check-lg me-1"></i> Save Changes
+               </button>
+               <form method="post" action="{% url 'invoice_delete' pk=invoice.pk %}"
+                  onsubmit="return confirm('Permanently delete this invoice?')" class="d-inline">
+                  {% csrf_token %}
+                  <button type="submit" class="btn btn-outline-danger" id="btn-delete">
+                     <i class="bi bi-trash3 me-1"></i> Delete
+                  </button>
+               </form>
+            </div>
+         </form>
+      </div>
+
+      <!-- Raw AI Response -->
+      {% if invoice.ai_response %}
+      <div class="detail-card">
+         <h5 class="fw-semibold mb-3">
+            <i class="bi bi-code-slash text-primary me-2"></i>Raw AI Response
+         </h5>
+         <pre class="bg-dark text-light p-3 rounded-3"
+            style="max-height: 300px; overflow-y: auto; font-size: 0.85rem;"><code>{{ invoice.ai_response|pprint }}</code></pre>
+      </div>
+      {% endif %}
+   </div>
+
+   <!-- ─── Right: Sidebar ───────────────────────────────────────── -->
+   <div class="col-lg-4">
+      <!-- Confidence Meter -->
+      <div class="detail-card mb-4">
+         <h5 class="fw-semibold mb-3">
+            <i class="bi bi-speedometer2 text-warning me-2"></i>AI Confidence
+         </h5>
+         <div class="text-center mb-3">
+            <div class="confidence-meter">
+               <svg viewBox="0 0 120 120" class="confidence-ring">
+                  <circle cx="60" cy="60" r="50" fill="none" stroke="var(--bs-border-color)" stroke-width="10" />
+                  <circle cx="60" cy="60" r="50" fill="none"
+                     stroke="var(--bs-{{ invoice.ai_confidence|confidence_color }})" stroke-width="10"
+                     stroke-dasharray="{% widthratio invoice.ai_confidence|default:0 1 314 %} 314"
+                     stroke-linecap="round" transform="rotate(-90 60 60)" />
+               </svg>
+               <div class="confidence-meter-value">
+                  {{ invoice.ai_confidence|confidence_pct }}
+               </div>
+            </div>
+         </div>
+         <div class="text-center">
+            <span
+               class="badge bg-{{ invoice.ai_confidence|confidence_color }}-subtle text-{{ invoice.ai_confidence|confidence_color }}-emphasis px-3 py-2">
+               {{ invoice.confidence_level|title }} Confidence
+            </span>
+         </div>
+      </div>
+
+      <!-- Metadata -->
+      <div class="detail-card mb-4">
+         <h5 class="fw-semibold mb-3">
+            <i class="bi bi-info-circle text-info me-2"></i>Metadata
+         </h5>
+         <div class="metadata-list">
+            <div class="metadata-item">
+               <span class="text-muted">Invoice ID</span>
+               <span class="font-monospace small">{{ invoice.id }}</span>
+            </div>
+            <div class="metadata-item">
+               <span class="text-muted">Content Hash</span>
+               <span class="font-monospace small">{{ invoice.content_hash|truncatechars:16 }}</span>
+            </div>
+            <div class="metadata-item">
+               <span class="text-muted">Parse Attempts</span>
+               <span>{{ invoice.parsed_attempts }}</span>
+            </div>
+            <div class="metadata-item">
+               <span class="text-muted">Parsed At</span>
+               <span>{{ invoice.parsed_at|default:"—" }}</span>
+            </div>
+            <div class="metadata-item">
+               <span class="text-muted">Created</span>
+               <span>{{ invoice.created_at|date:"d M Y H:i" }}</span>
+            </div>
+            <div class="metadata-item">
+               <span class="text-muted">Updated</span>
+               <span>{{ invoice.updated_at|date:"d M Y H:i" }}</span>
+            </div>
+         </div>
+         {% if invoice.parsing_error %}
+         <div class="alert alert-danger mt-3 mb-0 small">
+            <i class="bi bi-exclamation-triangle me-1"></i>
+            {{ invoice.parsing_error }}
+         </div>
+         {% endif %}
+      </div>
+
+      <!-- Audit Trail -->
+      <div class="detail-card">
+         <h5 class="fw-semibold mb-3">
+            <i class="bi bi-clock-history text-success me-2"></i>Audit Trail
+         </h5>
+         {% if audit_logs %}
+         <div class="audit-timeline">
+            {% for log in audit_logs %}
+            <div class="audit-item">
+               <div class="audit-dot bg-{{ log.action|lower|cut:'_' }}"></div>
+               <div class="audit-content">
+                  <span class="badge bg-secondary-subtle text-secondary-emphasis mb-1">
+                     {{ log.get_action_display }}
+                  </span>
+                  <p class="small text-muted mb-0">
+                     by {{ log.actor }} • {{ log.created_at|timesince }} ago
+                  </p>
+               </div>
+            </div>
+            {% endfor %}
+         </div>
+         {% else %}
+         <p class="text-muted small mb-0">No audit entries yet.</p>
+         {% endif %}
+      </div>
+   </div>
+</div>
+{% endblock %}

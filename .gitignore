@@ -1,0 +1,65 @@
+# ─── FinVibe — .gitignore ─────────────────────────────────────────
+
+# Environment & Secrets
+.env
+*.env.local
+
+# Database
+*.sqlite3
+db.sqlite3
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+*.egg-info/
+*.egg
+dist/
+build/
+.eggs/
+
+# Virtual Environment
+venv/
+.venv/
+env/
+ENV/
+
+# Testing & Coverage
+.coverage
+.coverage.*
+htmlcov/
+.pytest_cache/
+.tox/
+.nox/
+
+# Logs
+*.log
+logs/*.log
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+
+# Node (if frontend added later)
+node_modules/
+package-lock.json
+
+# Django
+staticfiles/
+media/
+
+# Docker
+*.pid
+
+# Gemini / AI
+.gemini/

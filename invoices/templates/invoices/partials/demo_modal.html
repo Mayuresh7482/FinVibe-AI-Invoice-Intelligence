@@ -1,0 +1,230 @@
+<!-- FinVibe — Demo Popup Modal (AI Invoice Parsing Quick Demo) -->
+<div class="modal fade demo-modal" id="demoModal" tabindex="-1" aria-labelledby="demoModalLabel" aria-hidden="true"
+   data-bs-backdrop="static">
+   <div class="modal-dialog modal-lg modal-dialog-centered">
+      <div class="modal-content">
+         <!-- Header -->
+         <div class="modal-header">
+            <div class="d-flex align-items-center gap-2">
+               <div class="brand-icon" style="width: 32px; height: 32px; font-size: 0.85rem;">
+                  <i class="bi bi-lightning-charge-fill"></i>
+               </div>
+               <div>
+                  <h5 class="demo-title mb-0" id="demoModalLabel">
+                     FinVibe Quick Demo — AI Invoice Parsing
+                  </h5>
+                  <small class="text-muted">
+                     Ek chota demo — paste kara sample invoice ani bghu kasa AI amount ani category kadhte.
+                  </small>
+               </div>
+            </div>
+            <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+         </div>
+
+         <!-- Body -->
+         <div class="modal-body">
+            <div class="row g-3">
+               <!-- Left: Input -->
+               <div class="col-md-6">
+                  <label class="form-label small fw-semibold text-muted mb-2">
+                     <i class="bi bi-file-earmark-text me-1"></i> Paste Invoice Text
+                  </label>
+                  <textarea class="form-control demo-textarea" id="demo-text" rows="10"
+                     placeholder="Paste sample invoice here...">Invoice No: DEMO-2025-001
+Date: 15/01/2025
+Vendor: Tata Consultancy Services
+Bill To: FinVibe Pvt Ltd
+Description: Software Development - Jan 2025
+Subtotal: ₹2,50,000.00
+GST (18%): ₹45,000.00
+Total Amount Due: ₹2,95,000.00
+Payment Terms: Net 30</textarea>
+                  <small class="text-muted mt-1 d-block">
+                     Edit or replace with your own invoice text.
+                  </small>
+               </div>
+
+               <!-- Right: Results -->
+               <div class="col-md-6">
+                  <label class="form-label small fw-semibold text-muted mb-2">
+                     <i class="bi bi-cpu me-1"></i> Parsed Results
+                  </label>
+
+                  <!-- Spinner -->
+                  <div class="demo-spinner" id="demo-spinner">
+                     <div class="spinner-border text-info mb-2" role="status">
+                        <span class="visually-hidden">Parsing...</span>
+                     </div>
+                     <p class="small mb-0">AI is extracting fields...</p>
+                  </div>
+
+                  <!-- Results container -->
+                  <div class="demo-result" id="demo-results">
+                     <div class="text-center text-muted py-4" id="demo-placeholder">
+                        <i class="bi bi-arrow-left display-6 opacity-25 d-block mb-2"></i>
+                        <span class="small">"Run Demo" dabun results bghya.</span>
+                     </div>
+                     <!-- Fields populated by JS -->
+                  </div>
+               </div>
+            </div>
+         </div>
+
+         <!-- Footer -->
+         <div class="modal-footer d-flex justify-content-between">
+            <div class="form-check form-switch">
+               <input class="form-check-input" type="checkbox" id="demo-hide-checkbox">
+               <label class="form-check-label small text-muted" for="demo-hide-checkbox">
+                  Don't show again
+               </label>
+            </div>
+            <div class="d-flex gap-2">
+               <button type="button" class="btn btn-demo" id="btn-run-demo" onclick="runDemo()">
+                  <i class="bi bi-play-fill me-1"></i> Run Demo
+               </button>
+               <a href="{% url 'invoice_create' %}" class="btn btn-coral">
+                  <i class="bi bi-rocket-takeoff me-1"></i> Use Live Parsing
+               </a>
+               <button type="button" class="btn btn-outline-secondary btn-sm" data-bs-dismiss="modal"
+                  onclick="handleDemoDismiss()">
+                  Close
+               </button>
+            </div>
+         </div>
+      </div>
+   </div>
+</div>
+
+<script>
+   /**
+    * FinVibe Demo — Handles the quick-demo popup interaction.
+    */
+
+   // Show popup on first visit (cookie-based)
+   document.addEventListener('DOMContentLoaded', function () {
+      if (!getCookie('finvibe_demo_seen') && document.getElementById('demoModal')) {
+         setTimeout(function () {
+            const modal = new bootstrap.Modal(document.getElementById('demoModal'));
+            modal.show();
+         }, 800);
+      }
+   });
+
+   function runDemo() {
+      const textEl = document.getElementById('demo-text');
+      const resultsEl = document.getElementById('demo-results');
+      const spinnerEl = document.getElementById('demo-spinner');
+      const placeholderEl = document.getElementById('demo-placeholder');
+      const btn = document.getElementById('btn-run-demo');
+
+      const rawText = textEl.value.trim();
+      if (rawText.length < 10) {
+         alert('Please paste at least 10 characters of invoice text.');
+         return;
+      }
+
+      // Show spinner
+      btn.disabled = true;
+      btn.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span> Parsing...';
+      if (placeholderEl) placeholderEl.style.display = 'none';
+      spinnerEl.style.display = 'block';
+      resultsEl.innerHTML = '';
+
+      // Call demo-only API (no Gemini quota consumed)
+      fetch('/api/demo-parse/', {
+         method: 'POST',
+         headers: {
+            'Content-Type': 'application/json',
+            'X-CSRFToken': getCSRFToken(),
+         },
+         body: JSON.stringify({ raw_text: rawText }),
+      })
+         .then(function (resp) { return resp.json(); })
+         .then(function (data) {
+            spinnerEl.style.display = 'none';
+            btn.disabled = false;
+            btn.innerHTML = '<i class="bi bi-play-fill me-1"></i> Run Demo';
+
+            if (data.success && data.data) {
+               displayDemoResults(data.data, data.latency_ms);
+            } else {
+               resultsEl.innerHTML = '<div class="text-warning text-center py-3">' +
+                  '<i class="bi bi-exclamation-triangle display-6 d-block mb-2"></i>' +
+                  '<span class="small">' + (data.error || 'Parse failed — try different text.') + '</span>' +
+                  '</div>';
+            }
+         })
+         .catch(function (err) {
+            spinnerEl.style.display = 'none';
+            btn.disabled = false;
+            btn.innerHTML = '<i class="bi bi-play-fill me-1"></i> Run Demo';
+            resultsEl.innerHTML = '<div class="text-danger text-center py-3">' +
+               '<i class="bi bi-x-circle display-6 d-block mb-2"></i>' +
+               '<span class="small">Network error — ' + err.message + '</span></div>';
+         });
+   }
+
+   function displayDemoResults(data, latencyMs) {
+      const el = document.getElementById('demo-results');
+      const confPct = Math.round((data.confidence || 0) * 100);
+      const confClass = confPct >= 85 ? 'text-success' : confPct >= 60 ? 'text-warning' : 'text-danger';
+      const confBadgeClass = confPct >= 85 ? 'bg-success' : confPct >= 60 ? 'bg-warning text-dark' : 'bg-danger';
+
+      el.innerHTML = [
+         demoField('Vendor', data.vendor_name || '—'),
+         demoField('Amount', data.amount ? ('₹' + parseFloat(data.amount).toLocaleString('en-IN', { minimumFractionDigits: 2 })) : '—'),
+         demoField('Date', data.date || '—'),
+         demoField('Category', '<span class="category-badge">' + (data.category || '—') + '</span>'),
+         demoField('Currency', data.currency || 'INR'),
+         '<div class="demo-field animate"><span class="label">Confidence</span>' +
+         '<span class="' + confClass + ' fw-bold">' +
+         '<span class="badge ' + confBadgeClass + '">' + confPct + '%</span>' +
+         ' <small class="text-muted" title="AI confidence: 0–1 madhun score; 0.85+ mhanje high.">' +
+         '<i class="bi bi-info-circle"></i></small></span></div>',
+         latencyMs ? '<div class="demo-field animate"><span class="label">Latency</span><span class="value text-muted">' + Math.round(latencyMs) + 'ms</span></div>' : '',
+      ].join('');
+   }
+
+   function demoField(label, value) {
+      return '<div class="demo-field animate"><span class="label">' + label + '</span><span class="value">' + value + '</span></div>';
+   }
+
+   function handleDemoDismiss() {
+      if (document.getElementById('demo-hide-checkbox').checked) {
+         setCookie('finvibe_demo_seen', '1', 365);
+      }
+   }
+
+   // On modal close via X button
+   document.addEventListener('DOMContentLoaded', function () {
+      const modal = document.getElementById('demoModal');
+      if (modal) {
+         modal.addEventListener('hidden.bs.modal', function () {
+            if (document.getElementById('demo-hide-checkbox').checked) {
+               setCookie('finvibe_demo_seen', '1', 365);
+            }
+         });
+      }
+   });
+
+   function getCSRFToken() {
+      const cookie = document.cookie.split(';').find(function (c) { return c.trim().startsWith('csrftoken='); });
+      if (cookie) return cookie.split('=')[1];
+      // Fallback: find in meta or hidden input
+      const meta = document.querySelector('meta[name="csrf-token"]');
+      if (meta) return meta.content;
+      const input = document.querySelector('input[name="csrfmiddlewaretoken"]');
+      return input ? input.value : '';
+   }
+
+   function setCookie(name, value, days) {
+      const d = new Date();
+      d.setTime(d.getTime() + days * 24 * 60 * 60 * 1000);
+      document.cookie = name + '=' + value + ';expires=' + d.toUTCString() + ';path=/;SameSite=Lax';
+   }
+
+   function getCookie(name) {
+      const match = document.cookie.match(new RegExp('(^| )' + name + '=([^;]+)'));
+      return match ? match[2] : null;
+   }
+</script>
